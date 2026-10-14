@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-10-14T17:40:57.231698+00:00",
+  "overall_result": "PASSED",
+  "traffic_metrics": {
+    "total_requests": 30,
+    "successful_requests": 30,
+    "failed_requests": 0,
+    "failure_rate_percent": 0.0,
+    "average_latency_ms": 51.69,
+    "p95_latency_ms": 127.47,
+    "traffic_distribution": {
+      "backend1": 16,
+      "backend2": 14
+    }
+  },
+  "chaos_metrics": {
+    "target_service": "backend1",
+    "failover_test_status": "FAILED",
+    "recovery_time_seconds": "N/A",
+    "chaos_experiment_summary": "Docker daemon is not running. Live container manipulation is blocked."
+  },
+  "limitations": [
+    "Measurements represent observed client responses through the gateway.",
+    "Active HTTP video streams cannot be guaranteed zero-byte resume if the serving container process abruptly terminates.",
+    "If Docker daemon was offline, container failover indicates configuration validation rather than live execution."
+  ]
+}

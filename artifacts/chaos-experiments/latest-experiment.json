@@ -1,0 +1,17 @@
+{
+  "experiment_id": "chaos-backend1-1791912422",
+  "target_service": "backend1",
+  "dry_run": true,
+  "start_time": "2026-10-13T17:27:02.845839+00:00",
+  "end_time": "2026-10-13T17:27:03.584279+00:00",
+  "docker_available": false,
+  "baseline_probes": [],
+  "failure_probes": [],
+  "recovery_probes": [],
+  "baseline_success_rate": 0.0,
+  "failure_success_rate": 0.0,
+  "detection_time_ms": "N/A",
+  "recovery_time_s": "N/A",
+  "service_restored": false,
+  "summary": "Docker daemon is not running. Live container manipulation is blocked."
+}

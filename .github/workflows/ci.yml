@@ -1,0 +1,243 @@
+name: StreamOps Continuous Integration & Production Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================
+  # Job A: Backend Validation & Unit Tests
+  # ============================================================
+  backend-validation:
+    name: Backend Validation (Python 3.11)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Backend & Reliability Unit Tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          pytest backend/tests -v --durations=10
+
+  # ============================================================
+  # Job B: Frontend Validation & Production Build
+  # ============================================================
+  frontend-validation:
+    name: Frontend Validation (Node.js 20.x)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Build Production Assets
+        run: npm run build
+
+      - name: Verify Production Assets Emitted
+        run: |
+          test -f dist/index.html || { echo "Missing dist/index.html"; exit 1; }
+          ls -lh dist/assets/
+
+  # ============================================================
+  # Job C: Static & Configuration Validation
+  # ============================================================
+  config-validation:
+    name: Configuration & Syntax Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration
+        run: docker compose config --quiet
+
+      - name: Validate Grafana Dashboard JSON Syntax
+        run: |
+          python3 -m json.tool monitoring/grafana/dashboards/streamops-overview.json > /dev/null
+          echo "Grafana dashboard JSON is valid."
+
+      - name: Validate Prometheus YAML Configuration
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('monitoring/prometheus/prometheus.yml'))"
+          echo "Prometheus YAML syntax is valid."
+
+      - name: Validate Grafana Provisioning YAML Configuration
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('monitoring/grafana/provisioning/datasources/prometheus.yml'))"
+          python3 -c "import yaml; yaml.safe_load(open('monitoring/grafana/provisioning/dashboards/dashboards.yml'))"
+          echo "Grafana provisioning YAML files are valid."
+
+      - name: Validate Gateway NGINX Configuration Syntax
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            nginx:alpine nginx -t
+
+      - name: Validate Frontend NGINX Configuration Syntax
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:alpine nginx -t
+
+  # ============================================================
+  # Job D: Container Image Builds
+  # ============================================================
+  docker-build:
+    name: Container Image Builds
+    needs: [backend-validation, frontend-validation, config-validation]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: streamops-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: streamops-frontend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build NGINX Gateway Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          push: false
+          tags: streamops-gateway:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================
+  # Job E: Compose Integration Smoke Test
+  # ============================================================
+  integration-smoke-test:
+    name: Compose Integration Smoke Test
+    needs: [docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Launch Core Compose Services
+        run: |
+          docker compose up -d --build nginx backend1 backend2 frontend
+
+      - name: Await Service Health
+        timeout-minutes: 2
+        run: |
+          echo "Polling StreamOps gateway health at http://localhost:8080/healthz..."
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/healthz > /dev/null 2>&1; then
+              echo "NGINX Gateway is healthy."
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Polling Backend cluster via gateway at http://localhost:8080/api/health..."
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null 2>&1; then
+              echo "Backend cluster is healthy."
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Verify Gateway Health and Readiness Endpoints
+        run: |
+          echo "=== Testing /api/health ==="
+          curl -fsS http://localhost:8080/api/health | jq .
+
+          echo "=== Testing /api/health/live ==="
+          curl -fsS http://localhost:8080/api/health/live | jq .
+
+          echo "=== Testing /api/health/ready ==="
+          curl -fsS http://localhost:8080/api/health/ready | jq .
+
+      - name: Verify Video Catalogue Discovery
+        run: |
+          echo "=== Testing /api/videos ==="
+          CATALOG_JSON=$(curl -fsS http://localhost:8080/api/videos)
+          echo "$CATALOG_JSON" | jq .
+          VIDEO_COUNT=$(echo "$CATALOG_JSON" | jq '.videos | length')
+          if [ "$VIDEO_COUNT" -lt 1 ]; then
+            echo "ERROR: Video catalogue is empty!"
+            exit 1
+          fi
+
+      - name: Verify RFC 7233 HTTP Range Streaming (206 Partial Content)
+        run: |
+          echo "=== Testing Range Request (0-1023 bytes) ==="
+          RESPONSE_HEADERS=$(curl -s -i -H "Range: bytes=0-1023" "http://localhost:8080/api/videos/sample/stream" -o /tmp/chunk.bin -w "%{http_code}")
+          
+          echo "$RESPONSE_HEADERS"
+          HTTP_STATUS=$(tail -n1 <<< "$RESPONSE_HEADERS")
+          
+          if [ "$HTTP_STATUS" != "206" ]; then
+            echo "ERROR: Expected HTTP 206 Partial Content, got $HTTP_STATUS"
+            exit 1
+          fi
+
+          CHUNK_SIZE=$(wc -c < /tmp/chunk.bin)
+          echo "Received byte chunk size: $CHUNK_SIZE bytes"
+          if [ "$CHUNK_SIZE" -ne 1024 ]; then
+            echo "ERROR: Expected 1024 bytes, got $CHUNK_SIZE"
+            exit 1
+          fi
+
+      - name: Collect Container Logs on Failure
+        if: failure()
+        run: |
+          docker compose logs --tail=100
+
+      - name: Teardown Compose Services
+        if: always()
+        run: |
+          docker compose down

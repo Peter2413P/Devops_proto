@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+  scrape_timeout: 8s
+
+scrape_configs:
+  # FastAPI backend application nodes
+  - job_name: "streamops-backend"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["backend1:8000", "backend2:8000"]
+        labels:
+          service: "streamops-fastapi"
+
+  # Container CPU, Memory, and Network telemetry (cAdvisor)
+  - job_name: "streamops-containers"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          service: "streamops-cadvisor"
+
+  # NGINX gateway connection and request telemetry (NGINX Prometheus Exporter)
+  - job_name: "streamops-nginx"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["nginx-exporter:9113"]
+        labels:
+          service: "streamops-nginx-gateway"

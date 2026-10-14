@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.git/
+.gitignore
+.github/
+backend/
+.venv/
+*.log
+.env
+.env.*
+tests/
+load-tests/
+tools/
+artifacts/
+monitoring/
+a.py
+*.md

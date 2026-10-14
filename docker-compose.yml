@@ -1,0 +1,196 @@
+services:
+  # -----------------------------------------------------------
+  # NGINX Entry Point & API Load Balancer (Port 8080)
+  # -----------------------------------------------------------
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: streamops-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend1:
+        condition: service_healthy
+      backend2:
+        condition: service_healthy
+    networks:
+      - streamops-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # -----------------------------------------------------------
+  # React Production Frontend (NGINX SPA container)
+  # -----------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: streamops-frontend
+    restart: unless-stopped
+    networks:
+      - streamops-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # -----------------------------------------------------------
+  # FastAPI Backend Instance 1
+  # -----------------------------------------------------------
+  backend1:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: streamops-backend1
+    restart: unless-stopped
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - INSTANCE_NAME=backend1
+      - VIDEO_DIR=/app/media
+      - FRONTEND_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - ./backend/media:/app/media:ro
+    networks:
+      - streamops-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # -----------------------------------------------------------
+  # FastAPI Backend Instance 2 (Load Balanced Replica)
+  # -----------------------------------------------------------
+  backend2:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: streamops-backend2
+    restart: unless-stopped
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - INSTANCE_NAME=backend2
+      - VIDEO_DIR=/app/media
+      - FRONTEND_ORIGINS=http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - ./backend/media:/app/media:ro
+    networks:
+      - streamops-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # -----------------------------------------------------------
+  # Prometheus Time-Series Metrics Database (Port 9090)
+  # -----------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: streamops-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}"
+      - "--web.enable-lifecycle"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - streamops-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--tries=1", "--spider", "http://127.0.0.1:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # -----------------------------------------------------------
+  # Grafana Observability Dashboards (Port 3000)
+  # -----------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: streamops-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/streamops-overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - streamops-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # -----------------------------------------------------------
+  # cAdvisor Container Resource Monitoring
+  # -----------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: streamops-cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - streamops-net
+
+  # -----------------------------------------------------------
+  # NGINX Prometheus Exporter
+  # -----------------------------------------------------------
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.3
+    container_name: streamops-nginx-exporter
+    restart: unless-stopped
+    command:
+      - -nginx.scrape-uri=http://nginx:80/stub_status
+    depends_on:
+      nginx:
+        condition: service_healthy
+    networks:
+      - streamops-net
+
+networks:
+  streamops-net:
+    name: streamops-network
+    driver: bridge
+
+volumes:
+  prometheus-data:
+    name: streamops-prometheus-data
+  grafana-data:
+    name: streamops-grafana-data

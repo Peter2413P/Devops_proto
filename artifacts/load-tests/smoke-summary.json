@@ -1,0 +1,185 @@
+{
+  "profile": "smoke",
+  "base_url": "http://127.0.0.1:8000",
+  "total_requests": 20,
+  "duration_seconds": 0.41,
+  "req_per_sec": 49.33,
+  "metrics": {
+    "http_reqs": {
+      "count": 20
+    },
+    "http_req_failed": {
+      "passes": 0,
+      "fails": 20
+    },
+    "http_req_duration": {
+      "avg": 93.72,
+      "p(95)": 191.94
+    }
+  },
+  "results": [
+    {
+      "status_code": 200,
+      "duration_ms": 169.52,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 152.69,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 181.19,
+      "bytes_received": 295,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 176.66,
+      "bytes_received": 295,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 206,
+      "duration_ms": 191.94,
+      "bytes_received": 1024,
+      "backend_instance": "backend-dev",
+      "content_range": "bytes 0-1023/788493",
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 48.96,
+      "bytes_received": 295,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 59.84,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 55.92,
+      "bytes_received": 295,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 206,
+      "duration_ms": 93.2,
+      "bytes_received": 1024,
+      "backend_instance": "backend-dev",
+      "content_range": "bytes 0-1023/788493",
+      "error": null
+    },
+    {
+      "status_code": 206,
+      "duration_ms": 77.17,
+      "bytes_received": 1024,
+      "backend_instance": "backend-dev",
+      "content_range": "bytes 0-1023/788493",
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 53.64,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 206,
+      "duration_ms": 62.17,
+      "bytes_received": 1024,
+      "backend_instance": "backend-dev",
+      "content_range": "bytes 0-1023/788493",
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 58.97,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 74.14,
+      "bytes_received": 294,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 80.94,
+      "bytes_received": 295,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 66.22,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 206,
+      "duration_ms": 100.77,
+      "bytes_received": 1024,
+      "backend_instance": "backend-dev",
+      "content_range": "bytes 0-1023/788493",
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 56.82,
+      "bytes_received": 295,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    },
+    {
+      "status_code": 206,
+      "duration_ms": 70.18,
+      "bytes_received": 1024,
+      "backend_instance": "backend-dev",
+      "content_range": "bytes 0-1023/788493",
+      "error": null
+    },
+    {
+      "status_code": 200,
+      "duration_ms": 43.42,
+      "bytes_received": 659,
+      "backend_instance": "backend-dev",
+      "content_range": null,
+      "error": null
+    }
+  ],
+  "backend_distribution": {
+    "backend-dev": 20
+  }
+}
